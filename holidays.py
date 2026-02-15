@@ -7,16 +7,13 @@ from threading import Thread
 import telebot
 import pytz
 
-# Импортируем настройки и праздники
 import config
 import holidays_data
 
-# Создаем бота
 bot = telebot.TeleBot(config.TOKEN)
 
-# ============================================
 # НАСТРОЙКА ЧАСОВОГО ПОЯСА (Москва)
-# ============================================
+
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
 # Файлы для хранения данных
@@ -27,7 +24,6 @@ def get_current_time():
     """Возвращает текущее время в часовом поясе Москвы"""
     return datetime.now(MOSCOW_TZ)
 
-# Вспомогательные функции
 def get_weekday_name(date):
     """Название дня недели на русском"""
     days = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
@@ -46,8 +42,6 @@ def get_today_holiday():
     if not holiday:
         holiday = random.choice(holidays_data.FUNNY_HOLIDAYS)
     return holiday
-
-# ==================== Работа с данными ====================
 
 def load_json(filename, default=None):
     """Загружает данные из JSON файла"""
@@ -80,15 +74,12 @@ def save_group_chats(chats):
     """Сохраняем групповые чаты"""
     save_json(GROUP_CHATS_FILE, chats)
 
-# ==================== Обработчики команд ====================
-
 @bot.message_handler(commands=['start'])
 def start_command(message):
     user_name = message.from_user.first_name
     chat_type = message.chat.type
     
     if chat_type == 'private':
-        # Личный чат
         bot.reply_to(message,
             f"👋 Привет, {user_name}!\n\n"
             f"Я {config.BOT_NAME}.\n"
@@ -99,7 +90,6 @@ def start_command(message):
             "/today - праздник сейчас\n"
             "/help - помощь")
     else:
-        # Групповой чат
         bot.reply_to(message,
             f"👋 Привет, {user_name}!\n\n"
             "Я могу присылать праздники в этот чат каждый день в 7 утра.\n\n"
@@ -198,7 +188,6 @@ def remove_chat_command(message):
 
 @bot.message_handler(commands=['today'])
 def today_command(message):
-    """Показать праздник прямо сейчас"""
     user_name = message.from_user.first_name
     holiday = get_today_holiday()
     now = get_current_time()
@@ -211,10 +200,10 @@ def today_command(message):
     
     bot.reply_to(message, msg, parse_mode='Markdown')
 
-
+"""
 @bot.message_handler(commands=['stats'])
 def stats_command(message):
-    """Статистика бота"""
+
     subs = load_subscribers()
     chats = load_group_chats()
     now = get_current_time()
@@ -229,6 +218,7 @@ def stats_command(message):
     )
     
     bot.reply_to(message, stats_msg, parse_mode='Markdown')
+"""
 
 @bot.message_handler(commands=['help'])
 def help_command(message):
@@ -249,32 +239,23 @@ def help_command(message):
     
     bot.reply_to(message, help_text, parse_mode='Markdown')
 
-# ==================== Функция рассылки ====================
 
 def morning_mailing():
     """Бесконечный цикл проверки времени и отправки"""
     while True:
         try:
             now = get_current_time()
-            
-            # Проверяем время
             if (now.hour == config.MORNING_HOUR and now.minute == config.MORNING_MINUTE):
                 if config.SEND_ON_WEEKENDS or not is_weekend(now):
                     print(f"📨 Рассылка в {now.strftime('%H:%M')} по Москве")
-                    
-                    # Получаем праздник
                     holiday = get_today_holiday()
                     date_str = now.strftime("%d.%m")
                     weekday = get_weekday_name(now)
-                    
-                    # Формируем сообщение
                     msg = (f"👋 Доброе утро!\n"
                            f"За бортом {date_str} {weekday}, "
                            f"#праздникнасегодня *{holiday['name']}*\n\n"
                            f"📝 {holiday['desc']}\n\n"
                            f"Хорошего дня! 😊")
-                    
-                    # 1. Отправляем личным подписчикам
                     subs = load_subscribers()
                     for uid, udata in subs.items():
                         try:
@@ -288,8 +269,6 @@ def morning_mailing():
                             time.sleep(0.1)
                         except Exception as e:
                             print(f"❌ Ошибка личной отправки {uid}: {e}")
-                    
-                    # 2. Отправляем в групповые чаты
                     chats = load_group_chats()
                     for chat_id, chat_data in chats.items():
                         try:
@@ -298,8 +277,6 @@ def morning_mailing():
                             time.sleep(0.1)
                         except Exception as e:
                             print(f"❌ Ошибка отправки в группу {chat_id}: {e}")
-                    
-                    # Чтобы не повторять в ту же минуту
                     time.sleep(60)
             
             time.sleep(30)
@@ -308,14 +285,13 @@ def morning_mailing():
             print(f"Ошибка в рассылке: {e}")
             time.sleep(60)
 
-# ==================== Запуск ====================
+
 
 if __name__ == "__main__":
     print("\n" + "="*50)
     print(f"🌅 {config.BOT_NAME}")
     print("="*50)
     
-    # Загружаем статистику
     subs = load_subscribers()
     chats = load_group_chats()
     current_time = get_current_time()
@@ -326,12 +302,10 @@ if __name__ == "__main__":
     print(f"📨 Рассылка: пн-пт в {config.MORNING_HOUR}:{config.MORNING_MINUTE:02d}")
     print("="*50 + "\n")
     
-    # Проверка токена
     if config.TOKEN == "7956422887:AAHm2b7p_y-MNwPj_23N6OPaUz_8Yb9QrOM":
         print("❌ ВНИМАНИЕ: в config.py указан токен-заглушка. Замените на свой!")
         exit()
-    
-    # Запускаем поток рассылки
+
     mailing_thread = Thread(target=morning_mailing, daemon=True)
     mailing_thread.start()
     
